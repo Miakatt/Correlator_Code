@@ -6,6 +6,8 @@ import os
 import sys
 import csv
 from PIL import Image
+from scipy.signal import convolve2d
+
 
 def OpenFile(arg):
     fullfilename = sys.argv[arg]
@@ -16,14 +18,14 @@ def OpenFile(arg):
 
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
-def WrapArray(ChemArray, TargetShape):
+def WrapArray(InputArray, TargetShape):
 
-    if len(ChemArray) != 1024:
+    if len(InputArray) != 1024:
         print ('Chemical Array Signature has unexpected length. Should be 1024.')
         sys.exit()
 
     else:
-        ShapedChemArray = np.reshape(ChemArray, (TargetShape))
+        ShapedChemArray = np.reshape(InputArray, TargetShape)
         return ShapedChemArray
 
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
@@ -43,29 +45,95 @@ def Resize(ShapedChemArray, n):
 
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
-def ManipulateArray(ShapedChemArray):
-	# Changes 0/1 binary shaped chemical array. Replaces zeros with a right-angle symbol
-	# and ones with a chequerboard symbol.
-	ManipulatedArray = np.zeros((n*ShapedChemArray.shape[0], n*ShapedChemArray.shape[1]))
-	ZeroReplace = [[1,1],[0,1]] #,[0,0,1]]
-	OneReplace  = [[1,0],[1,1]] # ,[0,1,0]]
-	for it in range(1024):
-		coords = np.unravel_index(it, (TargetShape))
-		if ShapedChemArray[coords] == 0:
-			ManipulatedArray[n*coords[0]:n*coords[0]+n,n*coords[1]:n*coords[1]+n] = ZeroReplace
-		elif ShapedChemArray[coords] == 1:	
-			ManipulatedArray[n*coords[0]:n*coords[0]+n,n*coords[1]:n*coords[1]+n] = OneReplace
-	return ManipulatedArray		
+#def ManipulateArray(InputArray):
+    # Changes 0/1 binary shaped chemical array. Replaces zeros with a right-angle symbol
+    # and ones with a chequerboard symbol.
+    #    ManipulatedArray = np.zeros((n*InputArray.shape[0], n*InputArray.shape[1]))
+    #ZeroReplace = [[1,0],[0,1]] #,[0,0,1]]
+    #OneReplace  = [[0,1],[1,0]] # ,[0,1,0]]
+    #for it in range(1024):
+    #    coords = np.unravel_index(it, (TargetShape))
+    #    if InputArray[coords] == 0:
+    #        #ManipulatedArray[n*coords[0]:n*coords[0]+n, n*coords[1]:n*coords[1]+n] = ZeroReplace
+    #        ManipulatedArray[n * coords[0]:n * coords[0] + n, n * coords[1]:n * coords[1] + n] = ZeroReplace
+    #    elif InputArray[coords] == 1:
+    #        ManipulatedArray[n*coords[0]:n*coords[0]+n, n*coords[1]:n*coords[1]+n] = OneReplace
+
+    #    plt.figure(2)
+    #plt.cla()
+    #plt.imshow(ManipulatedArray, cmap='gist_gray')
+    #plt.draw()
+    #plt.pause(0.1)
+
+    #return ManipulatedArray
+
+#oooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+
+def ManipulateArray(InputArray):
+    ManipulatedArray = np.zeros((33,33))
+
+#    for it in range(np.shape(InputArray)[0],1024 - np.shape(InputArray)[1]):
+    for it in range(1, 1024):
+        coords = np.unravel_index(it, (TargetShape))
+        if InputArray[coords] == 0:
+            #ManipulatedArray[n*coords[0]:n*coords[0]+n, n*coords[1]:n*coords[1]+n] = ZeroReplace
+            ManipulatedArray[coords[0]-1, coords[1]] = 1
+            ManipulatedArray[coords[0]+1, coords[1]] = 1
+            ManipulatedArray[coords[0]  , coords[1]] = 0
+            ManipulatedArray[coords[0]-1, coords[1]-1:coords[1]+1] = 1
+            ManipulatedArray[coords[0]+1, coords[1]-1:coords[1]+1] = 1
+
+        elif InputArray[coords] == 1:
+            ManipulatedArray[coords[0]-1, coords[1]] = 0
+            ManipulatedArray[coords[0]+1, coords[1]] = 0
+            ManipulatedArray[coords[0]  , coords[1]] = 1
+            ManipulatedArray[coords[0]-1, coords[1]-1:coords[1]+1] = 0
+            ManipulatedArray[coords[0]+1, coords[1]-1:coords[1]+1] = 0
+
+    ManipulatedArray = np.delete(ManipulatedArray, -1,0)
+    ManipulatedArray = np.delete(ManipulatedArray, -1,1)
+
+
+    plt.figure(2)
+    plt.cla()
+    plt.imshow(ManipulatedArray, cmap='gist_gray')
+    plt.draw()
+    plt.pause(0.1)
+
+    return ManipulatedArray
+
 
 
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
-def DisplayChemArray(ShapedChemArray, ChemID):
+
+def BitplanesToRGB(bitImage):
+    bitSegment = int(bitImage.shape[2] / 3)
+
+    bitPlaneR = np.zeros((bitImage.shape[0], bitImage.shape[1]))
+    bitPlaneG = np.zeros((bitImage.shape[0], bitImage.shape[1]))
+    bitPlaneB = np.zeros((bitImage.shape[0], bitImage.shape[1]))
+
+    for bp in np.arange(0, 7):
+        bitPlaneR += 2 ** (7 - bp) * bitImage[:, :, bp]
+    for bp in np.arange(8, 15):
+        bitPlaneG += 2 ** (15 - bp) * bitImage[:, :, bp]
+    for bp in np.arange(16, 23):
+        bitPlaneB += 2 ** (23 - bp) * bitImage[:, :, bp]
+
+    CombinedBitplanes = np.stack((bitPlaneR, bitPlaneG, bitPlaneB), axis=2)
+
+    return CombinedBitplanes
+
+#ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+
+
+def DisplayChemArray(InputArray, ChemID):
     plt.figure(1)
     plt.cla()
-    plt.imshow(ShapedChemArray, cmap='gist_gray', vmin=0, vmax=1)
+    plt.imshow(InputArray, cmap='gist_gray', vmin=0, vmax=1)
    # plt.pause(0.1)
-    SaveSingleImage(ShapedChemArray ,  ChemID)
+    SaveSingleImage(InputArray ,  ChemID)
 
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
@@ -78,7 +146,7 @@ def SaveSingleImage(ThisArray, ThisChemID):
 
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 def SaveReferenceImage(Ref, N):
-	plt.figure(2)
+	plt.figure(3)
 	ax1 = plt.gca()
 	ax1.cla()
 	ax1.xaxis.set_visible(False)
@@ -95,7 +163,6 @@ def SaveReferenceImage(Ref, N):
 
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 def GenerateRandomBackground(Shape, Saturation):
-	RandomBackground = np.zeros(Shape)
 	RandomBackground = np.random.choice([0,1], size=Shape, p=[Saturation, 1.0-Saturation])
 	return RandomBackground
 
@@ -103,14 +170,15 @@ def GenerateRandomBackground(Shape, Saturation):
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 
-def MakeReferencePage(Ref,  ShapedChemArray, j, k):
+def MakeReferencePage(Ref,  InputArray, j, k):
 
-    XStepStart = k * (ShapedChemArray.shape[1] )
-    XStepEnd = XStepStart + ShapedChemArray.shape[1]
-    YStepStart = j * (ShapedChemArray.shape[0] )
-    YStepEnd = YStepStart + ShapedChemArray.shape[0]
-    Ref[XStepStart:XStepEnd, YStepStart:YStepEnd] = ShapedChemArray
-    plt.figure(2)
+    XStepStart = k * (InputArray.shape[1] )
+    XStepEnd = XStepStart + InputArray.shape[1]
+    YStepStart = j * (InputArray.shape[0] )
+    YStepEnd = YStepStart + InputArray.shape[0]
+    print (XStepStart, XStepEnd, YStepStart, YStepEnd)
+    Ref[XStepStart:XStepEnd, YStepStart:YStepEnd] = InputArray
+    plt.figure(4)
     plt.cla()
     ax1 = plt.gca()
     ax1.xaxis.set_visible(False)
@@ -119,8 +187,8 @@ def MakeReferencePage(Ref,  ShapedChemArray, j, k):
     ax1.set_yticks([])
 
     plt.imshow(Ref, cmap='gist_gray', vmin=0, vmax=1)
-    #plt.draw()
-    #plt.pause(0.1)
+    plt.draw()
+    plt.pause(0.1)
 
 
 
@@ -132,7 +200,7 @@ def InitializeReference(RefShape):
 
 #oooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
-def EmbedTarget(ShapedChemArray, PadX, PadY):
+def EmbedTarget(InputArray, PadX, PadY):
 
     plt.figure(num=1, facecolor='white')
     ax2 = plt.gca()
@@ -141,14 +209,15 @@ def EmbedTarget(ShapedChemArray, PadX, PadY):
     ax2.set_xticks([])
     ax2.set_yticks([])
 
-    PaddedChemArray = np.pad(ShapedChemArray, ((PadY, PadY), (PadX,PadX)), 'constant', constant_values=(0,0) )
+    PaddedChemArray = np.pad(InputArray, ((PadY, PadY), (PadX,PadX)), 'constant', constant_values=(0,0) )
 
     return PaddedChemArray
 
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
-def MergeArrays(ManipulatedArray, RandomBackground):
-	MergedArrays = (ManipulatedArray != RandomBackground).astype(int)
-	return MergedArrays
+def MergeArrays(InputArray, RandomBackground):
+    MergedArrays = (InputArray != RandomBackground)
+
+    return MergedArrays
 
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
@@ -200,6 +269,8 @@ j = 0
 k = 0
 PageNo = 0
 w =1
+square = ([1,0],[1,1])
+negSquare = np.ones(np.shape(square)) - square
 
 #ImagePath = '/mnt/cloud_data/Cheminformatics_Images/'
 ImagePath = './SingleImages/'
@@ -218,7 +289,7 @@ if RegenerateRandom=='Y' or RegenerateRandom=='y':
 else:
 	GenRandom = False
 
-Saturation = 0.95
+Saturation = 1
 ApplyBlock = True
 DC_BlockSize = 10
 n = 2
@@ -240,20 +311,20 @@ print('Reading CHEM File - ', fullfilename)
 # This is to reduce the periodicity and get truer peaks according to Alex, who knows this stuff
 # 'cos he studied it at a uni with oak wall panels, so you know it's posh! 
 if (GenRandom):
-	RandomBackground = GenerateRandomBackground([n*TargetShape[0], n*TargetShape[1]], Saturation)
-	plt.imshow(RandomBackground, cmap='gist_gray_r', vmin=0, vmax=1)
-	plt.draw()
-	plt.pause(1)
-	plt.imsave(ImagePath+'RandomBackground.png', RandomBackground, vmin=0, vmax=1)
-	np.save(ImagePath+'RandomBackground', RandomBackground)
+    RandomBackground = GenerateRandomBackground([n*TargetShape[0], n*TargetShape[1]], Saturation)
+    plt.imshow(RandomBackground, cmap='gist_gray_r', vmin=0, vmax=1)
+    plt.draw()
+    plt.pause(1)
+    plt.imsave(ImagePath+'RandomBackground.png', RandomBackground, vmin=0, vmax=1)
+    np.save(ImagePath+'RandomBackground', RandomBackground)
 else:
-	RandomBackground = np.load(ImagePath+'RandomBackground.npy')
-	plt.imshow(RandomBackground, cmap='gist_gray_r')
-	plt.draw()
-	plt.pause(1)
-	plt.gcf()
-	plt.close('all')
-	print (RandomBackground[1,1])
+    RandomBackground = np.load(ImagePath+'RandomBackground.npy')
+    plt.imshow(RandomBackground, cmap='gist_gray_r')
+    plt.draw()
+    plt.pause(1)
+    plt.gcf()
+    plt.close('all')
+    print (RandomBackground[1,1])
 MergedArrays = np.zeros((n*TargetShape[0], n*TargetShape[1]))
 with open(fullfilename,'r') as f:
 
@@ -266,28 +337,36 @@ with open(fullfilename,'r') as f:
 
         ShapedChemArray = WrapArray(ChemArray, TargetShape)
         SaveSingleImage(ShapedChemArray, ChemID)
-     #   ShapedChemArray = Resize(ShapedChemArray, n)
+        print ('Shaped ' , np.shape(ShapedChemArray))
+        print ('Random ' , np.shape(RandomBackground))
+
         ManipulatedArray = ManipulateArray(ShapedChemArray)
+
+        print ('Manipulated ' , np.shape(ManipulatedArray))
+
         MergedArrays = MergeArrays(ManipulatedArray, RandomBackground)
+        print ('Merged ', np.shape(MergedArrays))
+
+
         #print (MergedArrays.shape)
       #  DisplayChemArray(MergedArrays, ChemID)
-        SaveSingleImage(MergedArrays, ChemID+'Encoded')
+        SaveSingleImage(ManipulatedArray, ChemID+'Encoded')
 
-        PaddedChemArray = EmbedTarget(MergedArrays, PadX, PadY)
+        PaddedChemArray = EmbedTarget(ManipulatedArray, PadX, PadY)
         ComputeAndSaveFilter(PaddedChemArray, ChemID)
 
       #  print (ChemID)
 
-        MakeReferencePage(Ref, MergedArrays, j, k)
+        MakeReferencePage(Ref, ManipulatedArray, j, k)
 
         j += 1
         ChemRow.append(str(ChemID))
-        if j == RefShape[1]/(n*TargetShape[1]):
+        if j == RefShape[1]/(ManipulatedArray.shape[0]):
         	MakeReferenceCSV(csvFile, ChemRow)
         	ChemRow = []
         	j = 0
         	k += 1
-        if (k >= RefShape[0]/(MergedArrays.shape[0])) : #and (j >= RefShape[1]/(ManipulatedArray.shape[1])-1):
+        if (k >= RefShape[0]/(ManipulatedArray.shape[0])) : #and (j >= RefShape[1]/(ManipulatedArray.shape[1])-1):
             SaveReferenceImage(Ref, PageNo)
             j = 0
             k = 0
