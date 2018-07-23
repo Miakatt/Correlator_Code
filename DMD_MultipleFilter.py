@@ -4,10 +4,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 from scipy import misc, ndimage
-
+from math import cos, radians
+import subprocess
 
 # Skews the image of the DMD to account for the 2:1 rows:columns in the device, if rotating.
 # Not used in this code as it wasn't required 
+#============================================================================================
 
 def displayImageOnDMD(image,n):
     #image = np.array(image)
@@ -26,10 +28,11 @@ def displayImageOnDMD(image,n):
     return image
 
 
+#============================================================================================
 
 # Makes input from of multiple input images.
 def MakeFrame(DMDSize, target,N, n):
-    frame = np.ones(DMDSize)
+    frame = np.zeros(DMDSize)
     print(DMDSize[0], DMDSize[1])
     cols = (np.arange(N*0.5*targetsize[0]+1, DMDSize[0]-1.1*N*targetsize[0], 2 * N*targetsize[0]))
     rows = (np.arange(N*0.5*targetsize[1]+1, DMDSize[1]-1.1*N*targetsize[1], 2 * N*targetsize[1]))
@@ -51,7 +54,7 @@ def MakeFrame(DMDSize, target,N, n):
 
 
 #============================================================================================
-# Comput the phase filter (uncomment line 74 if binary phase filter is required - i.e. for the 4DD)
+# Compute the phase filter (uncomment line 74 if binary phase filter is required - i.e. for the 4DD)
 def ComputeFilter(target, filtersize, n, rotation):
 
     targetX = target.shape[1]
@@ -79,14 +82,20 @@ def ComputeFilter(target, filtersize, n, rotation):
 
     return FourierFilter
 
+#============================================================================================
 
 # Creates a randomized square target image
 def MakeTarget(targetsize):
 
     target = np.ones((targetsize[1], targetsize[0]))
     target = np.random.randint(2, size = (targetsize[1], targetsize[0]))
-    #target[ int(targetsize[0]/2-5):int(targetsize[0]/2+5), : ] = 0
-    #target[:, int(targetsize[1]/2-5):int(targetsize[1]/2+5)] = 0
+    if (0):
+        for ii in np.arange(0, targetsize[0], 4):
+            print(ii)
+            target[ii, :] = 0
+            target[:, ii] = 0
+ #   target[ int(targetsize[0]/2-5):int(targetsize[0]/2+5), : ] = 0
+ #   target[:, int(targetsize[1]/2-5):int(targetsize[1]/2+5)] = 0
     plt.imshow(target, cmap=plt.cm.gray, vmin=0, vmax=1)
 
     plt.figure(2)
@@ -102,6 +111,7 @@ def MakeTarget(targetsize):
 
     return target
 
+#============================================================================================
 
 # Makes a frame of size filtersize. Embeds the phase filter image at the locations given by coords.
 # To overlay multiple filters, just call this function each time. It doesn't delete the previous filter frame.
@@ -153,6 +163,7 @@ def MakeFilterFrame(filter, framesize, coords):
 
     plt.imsave('filterframe.png', filterframe, cmap=plt.cm.gray, vmin=0., vmax=1.0)
 
+#============================================================================================
 
 # Scale the target by N. This is done AFTER the filter has been calculated, and scales the image to be displayed
 # on the input SLM so that the scaling in Octypus can remain as 1 (or 1:2, for the DMD).
@@ -160,11 +171,32 @@ def Scaletarget(target, scalingarray):
     return np.kron(target, scalingarray)
 
 
+#============================================================================================
+
+def squidgeTarget(target, angle):
+    newy = targetsize[1]*cos(radians(angle))
+    dimensions = '%.1fx50!' % (newy)
+    print (dimensions)
+    cmd = ['convert', 'target.png', '-resize', dimensions, 'resized.png']
+    print(cmd)
+    subprocess.call(cmd, shell=False)
+
+    squidgedTarget = misc.imread('resized.png','L')
+    return squidgedTarget
+
+#============================================================================================
+#============================================================================================
+#============================================================================================
+
+
+
 # Scaling factor
 N = 1
 # Rotate the filter image on the SLM to undo the physics rotation of the device
 # The SLM needs to be rotated to fit the 4 orders on
 Rot = -45
+# Set angle of reflectance between the laser and the optical axis.
+reflectAngle = 24 # degrees
 # Optical scaling constant, due to input/filter pixels and fourier lens selection.
 OctypusScaling = 520
 # Array used in the numpy kroncheker product in 'Scaletarget'
@@ -178,10 +210,10 @@ filtersize = int(OctypusScaling/N)
 # Size of the DMD
 DMDSize = [608,684]
 # Coordinates for the 4 filters to coincide with the 4 orders from the DMD
-coords1 = [416 , -382]
-coords2 = [-327,353]
-coords3 = [-320, -385]
-coords4 = [411, 355]
+coords1 = [428 , -378]
+coords2 = [-309, 355]
+coords3 = [-342, -416]
+coords4 = [460, 391]
 
 # Create an empty filter frame in which to embed the filters
 filterframe = np.zeros([framesize[1], framesize[0]])
@@ -201,8 +233,11 @@ frame1 = MakeFrame(DMDSize, Scaled_target1, N, 1)
 #frame2 = MakeFrame(DMDSize, Scaled_target, N, 2)
 
 
+squidgedTarget = squidgeTarget(target1, reflectAngle)
+print('size of squidged target: ', squidgedTarget.shape)
+
 # COMPUTE FILTER OF TARGET
-filter1 = ComputeFilter(target1, filtersize, 1, Rot)
+filter1 = ComputeFilter(squidgedTarget, filtersize, 1, Rot)
 # Uncomment if you want two different filter images on the filter frame
 #filter2 = ComputeFilter(target2, filtersize, 2, Rot)
 
