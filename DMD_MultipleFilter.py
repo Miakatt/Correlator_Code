@@ -5,6 +5,7 @@ import numpy as np
 import sys
 from scipy import misc, ndimage
 from math import cos, radians
+from PIL import Image
 import subprocess
 
 # Skews the image of the DMD to account for the 2:1 rows:columns in the device, if rotating.
@@ -174,14 +175,19 @@ def Scaletarget(target, scalingarray):
 #============================================================================================
 
 def squidgeTarget(target, angle):
-    newy = targetsize[1]*cos(radians(angle))
-    dimensions = '%.1fx50!' % (newy)
-    print (dimensions)
-    cmd = ['convert', 'target.png', '-resize', dimensions, 'resized.png']
-    print(cmd)
-    subprocess.call(cmd, shell=False)
+    newY = int(round(targetsize[1]*cos(radians(angle)), 0))
+    print(newY, targetsize[0])
+    print (type(target))
+    squidgedTarget = misc.imresize(target, ( targetsize[0], newY ), 'bilinear')
+    plt.imsave('resized_target.png', squidgedTarget, cmap=plt.cm.gray)
 
-    squidgedTarget = misc.imread('resized.png','L')
+   # dimensions = '%.1fx50!' % (newY)
+   # print (dimensions)
+   # cmd = ['convert', 'target.png', '-resize', dimensions, 'resized.png']
+   # print(cmd)
+   # subprocess.call(cmd, shell=False)
+
+    #squidgedTarget = misc.imread('resized.png','L')
     return squidgedTarget
 
 #============================================================================================
