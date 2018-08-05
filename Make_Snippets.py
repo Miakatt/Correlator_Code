@@ -83,6 +83,12 @@ def ApplyDCBlock(filter, dc):
 def InitializeReference(RefSize):
     Ref = np.zeros(RefSize)
     return Ref
+
+
+
+#========================================================================================================================
+#============================================ CODE STARTS HERE ==========================================================
+#========================================================================================================================
 # Make some variables
 
 # Shape of the snippets (Doesn't have to be square!)
@@ -98,7 +104,7 @@ filtersize = 1000
 DCBlock = [5,10,20,50]
 
 
-
+#========================================================================================================================
 
 for ds in DataShape:
     Ref = InitializeReference(RefSize)
@@ -110,3 +116,6 @@ for ds in DataShape:
     for dc in DCBlock:
         filter = ApplyDCBlock(filter, dc)
         plt.imsave('Snippet_'+str(ds[1])+'x'+str(ds[0])+'_DCBlock_'+str(dc)+'x'+str(dc)+'.png', filter, cmap=plt.cm.gray, vmin=0., vmax=1.0)
+
+
+#========================================================================================================================
