@@ -25,30 +25,55 @@ def displayImageOnDMD(image,n):
         image[:,imageCols-col-3] = np.roll(image[:,imageCols-col-3], -counter)
         counter = counter - 1
     image[:,imageCols-1] = np.roll(image[:,imageCols-1],counter)
-    plt.imsave('input_DMD_rotated'+str(n)+'.png',image, cmap = 'gray', vmin=0, vmax=1 )
+    plt.imsave('input_DMD_rotated'+str(n)+'.png',image, 'L', cmap = 'gray', vmin=0, vmax=1 )
     return image
 
 
 #============================================================================================
 
 # Makes input from of multiple input images.
-def MakeFrame(DMDSize, target,N, n):
-    frame = np.zeros(DMDSize)
-    print(DMDSize[0], DMDSize[1])
-    cols = (np.arange(N*0.5*targetsize[0]+1, DMDSize[0]-1.1*N*targetsize[0], 2 * N*targetsize[0]))
-    rows = (np.arange(N*0.5*targetsize[1]+1, DMDSize[1]-1.1*N*targetsize[1], 2 * N*targetsize[1]))
+def MakeFrame(DMDSize, allTargets):
+    oversizedDMDSize = [3000,3000]
+    if 'oversizedDMDImage' not in locals():
+        oversizedDMDImage = np.zeros(oversizedDMDSize)
 
-    for r, row in enumerate(rows):
-        for s, col in enumerate(cols):
-            frame[int(col):int(col)+int(N*targetsize[0]),int(row):int(row+N*targetsize[1])] = target
 
+    print(0, oversizedDMDSize[0] - allTargets.shape[0], allTargets.shape[0])
+    cols = np.arange(0, oversizedDMDSize[0]-allTargets.shape[0], allTargets.shape[0]+10)
+    rows = np.arange(0, oversizedDMDSize[1]-allTargets.shape[1], allTargets.shape[1]+10)
+
+    print (cols)
+    print (rows)
+
+
+    for r in rows:
+        for c in cols:
+            oversizedDMDImage[c:c+allTargets.shape[1], r:r+allTargets.shape[0]] = allTargets
+
+#    cols = (np.arange(N*0.5*targetsize[1]+1, oversizedDMDSize[1]-1.1*N*targetsize[1], len(target) * N*targetsize[1]))
+#    rows = (np.arange(N*0.5*targetsize[0]+1, oversizedDMDSize[0]-1.1*N*targetsize[0], 2 * N*targetsize[1]))
+#
+#        for tar in target:
+#        print (i)
+#        for r, row in enumerate(rows):
+#            for s, col in enumerate(cols):
+#                oversizedDMDImage[int(col):int(col)+int(N*targetsize[0]), int(row): int(row+N*targetsize[1])] = tar
+
+    # Crop out DMDSize area from oversized DMD
+    cropY = (oversizedDMDSize[0] - DMDSize[0]) // 2
+    cropX = (oversizedDMDSize[1] - DMDSize[1]) // 2
+
+    print(cropX, cropY)
+    frame = oversizedDMDImage[cropY:DMDSize[0]+cropY , cropX:DMDSize[1]+cropX]
+    print('Frame Shape  ', frame.shape)
     ax1 = plt.gca()
     ax1.xaxis.set_visible(False)
     ax1.yaxis.set_visible(False)
     plt.imshow(frame, cmap='gray', vmin=0, vmax=1)
     plt.draw()
+    plt.pause(1)
 
-    plt.imsave('input_DMD_'+str(n)+'.png', frame, cmap='gray', vmin=0, vmax = 1)
+    plt.imsave('input_DMD.png', frame, cmap='gray', vmin=0, vmax = 1)
     plt.cla()
     print("Saving frame.")
     return frame
@@ -60,8 +85,8 @@ def ComputeFilter(target, filtersize, n, rotation):
 
     targetX = target.shape[1]
     targetY = target.shape[0]
-    PadX = int(np.floor(0.5 * (filtersize - targetX)))
-    PadY = int(np.floor(0.5 * (filtersize - targetY)))
+    PadX = int(np.floor(0.5 * (filtersize[0] - targetX)))
+    PadY = int(np.floor(0.5 * (filtersize[1] - targetY)))
     print('targetX %2.1f : targetY %2.1f  : PadX  %2.1f : PadY %2.1f ' % (targetX, targetY, PadX, PadY))
 
     paddedtarget = np.pad(target, [(PadY, ), (PadX, ) ], mode='constant', constant_values = 1.0)
@@ -75,9 +100,9 @@ def ComputeFilter(target, filtersize, n, rotation):
 
     targetFT = np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(paddedtarget)))
     conjugatePhaseTargetFT = -(np.angle(targetFT))
-    #binaryConjugatePhaseTargetFT = ((conjugatePhaseTargetFT > 0.0)).astype(int)
-
-    FourierFilter = np.rot90(conjugatePhaseTargetFT, 3)
+    binaryConjugatePhaseTargetFT = ((conjugatePhaseTargetFT > 0.0)).astype(int)
+    FourierFilter = binaryConjugatePhaseTargetFT
+    #FourierFilter = np.rot90(conjugatePhaseTargetFT, 3)
     FourierFilter = ndimage.interpolation.rotate(FourierFilter, rotation, mode='constant', cval=1, reshape=True)
     plt.imsave('FourierFilter_'+str(n)+'.png', FourierFilter, cmap=plt.cm.gray, vmin=0., vmax=1.0)
 
@@ -88,7 +113,7 @@ def ComputeFilter(target, filtersize, n, rotation):
 # Creates a randomized square target image
 def MakeTarget(targetsize):
 
-    target = np.ones((targetsize[1], targetsize[0]))
+    np.random.seed(Seed)
     target = np.random.randint(2, size = (targetsize[1], targetsize[0]))
     if (0):
         for ii in np.arange(0, targetsize[0], 4):
@@ -126,8 +151,8 @@ def MakeFilterFrame(filter, framesize, coords):
 
 
     print(framex1, framey1)
-    halfwidth = int(np.ceil(filter.shape[1] / 2))
-    halfheight = int(np.ceil(filter.shape[0] / 2))
+    halfwidth = int(np.floor(filter.shape[1] / 2))
+    halfheight = int(np.floor(filter.shape[0] / 2))
 
     print('framex1  ', framex1)
     print('framey1  ', framey1)
@@ -136,26 +161,25 @@ def MakeFilterFrame(filter, framesize, coords):
 
     if ( framex1 + halfwidth > framesize[0]):
         framecut = framesize[0] - framex1
-        filterframe[framey1 - halfheight: framey1 + halfheight, framex1 - halfwidth: framex1 + framecut] = filter[:,0:halfwidth+framecut]
+        filterframe[framey1 - halfheight: framey1 + halfheight, framex1 - halfwidth+1: framex1 + framecut] = filter[:,0:halfwidth+framecut]
 
 
     elif (framex1 - halfwidth < 0):
         framecut = framex1
-        filterframe[framey1 - halfheight: framey1 + halfheight, framex1 - framecut: framex1 + halfwidth] = filter[:,halfwidth-framecut:filter.shape[1]]
+        filterframe[framey1 - halfheight: framey1 + halfheight, framex1 - framecut+1: framex1 + halfwidth] = filter[:,halfwidth-framecut:filter.shape[1]]
 
     elif (framey1 - halfheight < 0):
         framecut=framey1
-        filterframe[framey1 - framecut: framey1 + halfheight, framex1 - halfwidth+1: framex1 + halfwidth] = filter[halfheight-framecut-1 : filter.shape[0] ,:]
+        filterframe[framey1 - framecut: framey1 + halfheight, framex1 - halfwidth+1: framex1 + halfwidth+1] = filter[halfheight-framecut : filter.shape[0] ,:]
 
     elif (framey1+halfheight > framesize[1]):
         framecut = framesize[1] - framey1
-        filterframe[framey1 - halfheight   : framey1+framecut, framex1 - halfwidth + 1: framex1 + halfwidth] = filter[0:halfheight+framecut ,:]
+        filterframe[framey1 - halfheight   : framey1+framecut, framex1 - halfwidth + 1: framex1 + halfwidth+1] = filter[0:halfheight+framecut ,:]
 
 
     else:
         print(filter.shape)
-        print("gttftt", framey1 - halfheight, framey1 + halfheight, framex1 - halfwidth, framex1 + halfwidth)
-        filterframe[framey1 - halfheight: framey1 + halfheight, framex1 - halfwidth: framex1 + halfwidth] = filter
+        filterframe[framey1 - halfheight : framey1 + halfheight , framex1 - halfwidth+1: framex1 + halfwidth] = filter
 
 
     plt.imshow(filterframe, cmap = 'gray', vmin =0, vmax=1)
@@ -194,63 +218,69 @@ def squidgeTarget(target, angle):
 #============================================================================================
 #============================================================================================
 
-
-
+# Random Seed. Set to a number to get 4 indentical target image.
+Seed = None
 # Scaling factor
 N = 1
 # Rotate the filter image on the SLM to undo the physics rotation of the device
 # The SLM needs to be rotated to fit the 4 orders on
-Rot = -45
+Rot = 0
 # Set angle of reflectance between the laser and the optical axis.
-reflectAngle = 24 # degrees
+reflectAngle = 0 # normally 24 degrees
 # Optical scaling constant, due to input/filter pixels and fourier lens selection.
-OctypusScaling = 520
+OctypusScaling = [1116, 1116] # [x, y]
 # Array used in the numpy kroncheker product in 'Scaletarget'
 scalingarray = np.ones([N,N])
 # Size of the input target image (before scaling and filter computation)
-targetsize = [50,50]
+targetsize = [102 ,102]
 # Size of the filter SLM
-framesize = [1920,1080]
+framesize = [2560, 1600]
 # Size of the phase filter image
-filtersize = int(OctypusScaling/N)
+filtersize = [int(OctypusScaling[0]/N) , int(OctypusScaling[1]/N)]  # [x,y]
 # Size of the DMD
-DMDSize = [608,684]
+DMDSize = [1080, 1920]
 # Coordinates for the 4 filters to coincide with the 4 orders from the DMD
-coords1 = [428 , -378]
-coords2 = [-309, 355]
-coords3 = [-342, -416]
-coords4 = [460, 391]
+coords = ([-443, -614],[674, -629],[-431, 499],[686, 487])
 
 # Create an empty filter frame in which to embed the filters
 filterframe = np.zeros([framesize[1], framesize[0]])
 
-
+frame = np.zeros(DMDSize)
 # MAKE A TARGET
-target1 = MakeTarget(targetsize)
-# Uncomment if you want two different input images
-#target2 = MakeTarget(targetsize)
+targetList = []
+Scaled_target = []
+filterList = []
 
-# Scale the target (in cases where you want the filter image to be smaller)
-Scaled_target1 = Scaletarget(target1, scalingarray)
-#Scaled_target2 = Scaletarget(target2, scalingarray)
+
+for it, co in enumerate(coords):
+    targetList.append(MakeTarget(targetsize))
+    # Scale the target (in cases where you want the filter image to be smaller)
+    Scaled_target.append(Scaletarget(targetList[-1], scalingarray))
+
+
+    #squidgedTarget = squidgeTarget(target1, reflectAngle)
+    #print('size of squidged target: ', squidgedTarget.shape)
+    #
+    # COMPUTE FILTER OF TARGET
+    filterList.append(ComputeFilter(targetList[-1], filtersize, 1, Rot))
+    # Uncomment if you want two different filter images on the filter frame
+
+
+    # EMBED FILTER IN TO FILTERFRAME AT COORDS
+    # Pass filterN to each one if different filters are required. This just copies the same filter 4 times.
+    #for co in coords:
+    MakeFilterFrame(filterList[-1], framesize, co)
+
+
+
+#for s in range(len(targetList)):
+#    plt.figure(num=s)
+#    plt.imshow(targetList[s])
+#    plt.draw()
+#    plt.pause(0.1)
 # MAKE A FRAME FULL OF TARGETS
-frame1 = MakeFrame(DMDSize, Scaled_target1, N, 1)
-# Uncomment if you want two different frames of input images
-#frame2 = MakeFrame(DMDSize, Scaled_target, N, 2)
-
-
-squidgedTarget = squidgeTarget(target1, reflectAngle)
-print('size of squidged target: ', squidgedTarget.shape)
-
-# COMPUTE FILTER OF TARGET
-filter1 = ComputeFilter(squidgedTarget, filtersize, 1, Rot)
-# Uncomment if you want two different filter images on the filter frame
-#filter2 = ComputeFilter(target2, filtersize, 2, Rot)
-
-
-# EMBED FILTER IN TO FILTERFRAME AT COORDS
-# Pass filterN to each one if different filters are required. This just copies the same filter 4 times.
-MakeFilterFrame(filter1, framesize, coords1)
-MakeFilterFrame(filter1, framesize, coords2)
-MakeFilterFrame(filter1, framesize, coords3)
-MakeFilterFrame(filter1, framesize, coords4)
+targetpair1 = np.concatenate((Scaled_target[0], Scaled_target[1]), axis=1)
+targetpair2 = np.concatenate((Scaled_target[2], Scaled_target[3]), axis=1)
+allTargets = np.concatenate((targetpair1, targetpair2), axis=0)
+print('Target Size : ' , allTargets.shape[0])
+frame = MakeFrame(DMDSize, allTargets)
